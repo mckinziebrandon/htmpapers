@@ -22,6 +22,7 @@
 import argparse
 import copy
 import os
+import pdb
 import re
 from itertools import groupby
 from pathlib import Path
@@ -29,7 +30,7 @@ from pathlib import Path
 import pandas as pd
 
 from experiments import CONFIGS
-from nupic.research.support import load_ray_tune_experiments
+from nupic.research.frameworks.ray import load_ray_tune_experiments
 
 
 # Select a unique tag for each parameter combination, ignoring seed value
@@ -101,9 +102,11 @@ def parse_one_experiment(exp, state, df, outmethod):
                         best_results = max(
                             results, key=lambda x: x.get("mean_accuracy", 0.0)
                         )
-                        best_result = best_results["mean_accuracy"]
+                        print(f'[type={type(best_results)}] best_result={best_results}')
+                        best_result = best_results.get("mean_accuracy", 0.0)
+                        print(f'best_result={best_result}')
                         if best_result > 0.0:
-                            parse(best_result, results, trial_checkpoint, df_entries,
+                            parse(best_result, best_results, trial_checkpoint, df_entries,
                                   exp, tag)
                     elif outmethod == "lasttask":
                         print("using parsing method : lasttask")
@@ -116,12 +119,13 @@ def parse_one_experiment(exp, state, df, outmethod):
                         print("using parsing method : all")
                         for i, _ in enumerate(results):
                             i_results = results[i]
-                            i_result = i_results["mean_accuracy"]
+                            i_result = i_results.get("mean_accuracy", 0.0)
                             if i_result > 0.0:
                                 parse(i_result, i_results, trial_checkpoint,
                                       df_entries, exp, tag)
 
-            except Exception:
+            except Exception as e:
+                print(f'ERROR: {e.__class__.__name__} {e}')
                 print(f"Problem with checkpoint group {tag} in {exp} ...skipping")
                 continue
 

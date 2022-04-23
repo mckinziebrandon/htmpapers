@@ -48,7 +48,7 @@ if __name__ == "__main__":
                         default="default_base", help="Experiment to run",
                         choices=list(CONFIGS.keys()))
     parser.add_argument("--run_without_ray_tune", dest="run_without_ray_tune",
-                        type=bool, default=False,
+                        action='store_true',
                         help="run by calling ray.run_with_ray_tune or vernon.run")
 
     args = parser.parse_args()

@@ -31,6 +31,7 @@ import numpy as np
 import ray.tune as tune
 import torch
 import torch.nn.functional as F
+from torchvision import datasets, transforms
 
 from nupic.research.frameworks.continual_learning import mixins as cl_mixins
 from nupic.research.frameworks.dendrites import DendriticMLP
@@ -41,6 +42,71 @@ from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
+
+
+class SplitMNIST(datasets.MNIST):
+
+    def __init__(self, train, root=".", target_transform=None,
+                 download=False, normalize=True):
+
+        t = [transforms.ToTensor()]
+        if normalize:
+            t.append(transforms.Normalize((0.13062755,), (0.30810780,)))
+        data_transform = transforms.Compose(t)
+        super().__init__(root=root, train=train, transform=data_transform,
+                         target_transform=target_transform, download=download)
+
+        # (0, 1), (2, 3), (4, 5), (6, 7), (8, 9)
+        self.num_tasks = 5
+        self.task_to_digits = [
+            (2 * i, 2 * i + 1) for i in range(self.num_tasks)]
+        self.index_to_task_id = [
+            self[i][1] // 2
+            for i in range(len(self.data))
+        ]
+
+        from collections import Counter
+        task_id_to_num_samples = Counter()
+        for i in range(len(self)):
+            task_id = self.get_task_id(i)
+            task_id_to_num_samples[task_id] += 1
+
+        for task_id in range(5):
+            assert task_id_to_num_samples[task_id] > 1000, \
+                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+            # assert task_id_to_num_samples[task_id] == len(self.data) // 5, \
+            #     f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+
+        # self.task_to_data = [[] for _ in range(self.num_tasks)]
+        # for i in range(len(self.data)):
+        #     img, target = super().__getitem__(i % len(self.data))
+        #     task_idx = target // 2
+        #     self.task_to_data[task_idx].append((img, target))
+
+    def __getitem__(self, index):
+        img, target = super().__getitem__(index)
+        return img, target
+
+    def __len__(self):
+        return len(self.data)
+
+    @property
+    def processed_folder(self):
+        return os.path.join(self.root, "SplitMNIST", "processed")
+
+    def get_task_id(self, index):
+        # return index % 2
+        # return index % self.num_tasks
+        assert 0 <= index < len(self.index_to_task_id), index
+        res = self.index_to_task_id[index]
+        assert isinstance(res, int), type(res)
+        assert 0 <= res < 5, res
+        return res
+
+class SplitMNISTExperiment(vernon_mixins.RezeroWeights,
+                          dendrites_mixins.PrototypeContext,
+                          DendriteContinualLearningExperiment):
+    pass
 
 
 class PrototypeExperiment(vernon_mixins.RezeroWeights,
@@ -56,6 +122,9 @@ class PrototypeFigure1BExperiment(dendrites_mixins.PrototypeFigure1B,
     pass
 
 
+def seed_fn(spec):
+    return np.random.randint(2, 10000)
+
 PROTOTYPE_BASE = dict(
     experiment_class=PrototypeExperiment,
     num_samples=1,
@@ -66,7 +135,7 @@ PROTOTYPE_BASE = dict(
     dataset_class=PermutedMNIST,
     dataset_args=dict(
         root=os.path.expanduser("~/nta/results/data/"),
-        download=False,  # Change to True if running for the first time
+        download=True,  # Change to True if running for the first time
         seed=42,
     ),
 
@@ -83,17 +152,51 @@ PROTOTYPE_BASE = dict(
         context_percent_on=0.1,
     ),
 
+    # batch_size=2,
+    # val_batch_size=2,
+    # tasks_to_validate=[4],
     batch_size=256,
     val_batch_size=512,
     tasks_to_validate=[1, 4, 9, 24, 49, 99],
     distributed=False,
-    seed=tune.sample_from(lambda spec: np.random.randint(2, 10000)),
+    seed=tune.sample_from(seed_fn),
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
 )
 
+# NB: GLOBAL BATCH SIZE CAN'T BE ANY LARGER THAN MIN(EXAMPLES_PER_TASK)
+SPLIT_MNIST = deepcopy(PROTOTYPE_BASE)
+SPLIT_MNIST["dataset_class"] = SplitMNIST
+SPLIT_MNIST["dataset_args"] = dict(
+    root=os.path.expanduser("~/nta/results/data/"),
+    download=True,  # Change to True if running for the first time
+)
+SPLIT_MNIST["model_args"].update(
+    kw_percent_on=0.05,
+    weight_sparsity=0.8,
+    hidden_sizes=[8192, 8192],
+    output_size=2,  # Single output head shared by all tasks
+    num_segments=5)
+SPLIT_MNIST.update(
+    experiment_class=SplitMNISTExperiment,
+    batch_size=512,
+    val_batch_size=512,
+    num_samples=3,
+    num_tasks=5,
+    num_classes=2 * 5,
+    epochs=5,
+    optimizer_args=dict(lr=1e-4),
+    tasks_to_validate=[4],
+)
+# TODO: why the fuck is the required for me but not permutedMNIST???
+# ok yes they had a 10 hardcoded F.M.L.
+# (dendrite_cl_experiment L84)
+SPLIT_MNIST['train_model_args'] = dict(
+    share_labels=True,
+    num_labels=2
+)
 
 PROTOTYPE_2 = deepcopy(PROTOTYPE_BASE)
 PROTOTYPE_2["dataset_args"].update(num_tasks=2)
@@ -203,4 +306,5 @@ CONFIGS = dict(
     prototype_25=PROTOTYPE_25,
     prototype_50=PROTOTYPE_50,
     prototype_100=PROTOTYPE_100,
+    split_mnist=SPLIT_MNIST,
 )
