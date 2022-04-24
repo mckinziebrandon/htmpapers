@@ -1,3 +1,4 @@
+from collections import Counter
 import os
 from copy import deepcopy
 
@@ -39,7 +40,6 @@ class SplitMNIST(datasets.MNIST):
             for i in range(len(self.data))
         ]
 
-        from collections import Counter
         task_id_to_num_samples = Counter()
         for i in range(len(self)):
             task_id = self.get_task_id(i)
@@ -48,21 +48,6 @@ class SplitMNIST(datasets.MNIST):
         for task_id in range(5):
             assert task_id_to_num_samples[task_id] > 1000, \
                 f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
-            # assert task_id_to_num_samples[task_id] == len(self.data) // 5, \
-            #     f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
-
-        # self.task_to_data = [[] for _ in range(self.num_tasks)]
-        # for i in range(len(self.data)):
-        #     img, target = super().__getitem__(i % len(self.data))
-        #     task_idx = target // 2
-        #     self.task_to_data[task_idx].append((img, target))
-
-    def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        return img, target
-
-    def __len__(self):
-        return len(self.data)
 
     @property
     def processed_folder(self):
@@ -77,5 +62,88 @@ class SplitMNIST(datasets.MNIST):
         assert 0 <= res < 5, res
         return res
 
+
 class SplitCIFAR10(datasets.CIFAR10):
-    pass
+
+    def __init__(self,
+                 train,
+                 root=".",
+                 transform=None,
+                 target_transform=None,
+                 download=False):
+        super().__init__(
+            root=root,
+            train=train,
+            transform=transform,
+            target_transform=target_transform,
+            download=download)
+
+        self.num_tasks = 5
+        self.task_to_class_idx = [
+            (2 * i, 2 * i + 1) for i in range(self.num_tasks)]
+        self.index_to_task_id = [
+            self[i][1] // 2 for i in range(len(self.data))]
+
+        task_id_to_num_samples = Counter()
+        for i in range(len(self)):
+            task_id = self.get_task_id(i)
+            task_id_to_num_samples[task_id] += 1
+
+        for task_id in range(5):
+            assert task_id_to_num_samples[task_id] > 1000, \
+                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+
+    @property
+    def processed_folder(self):
+        return os.path.join(self.root, "SplitCIFAR10", "processed")
+
+    def get_task_id(self, index):
+        assert 0 <= index < len(self.index_to_task_id), index
+        res = self.index_to_task_id[index]
+        assert isinstance(res, int), type(res)
+        assert 0 <= res < 5, res
+        return res
+
+
+class SplitCIFAR100(datasets.CIFAR100):
+
+    def __init__(self,
+                 train,
+                 num_tasks: int,
+                 root=".",
+                 transform=None,
+                 target_transform=None,
+                 download=False):
+        super().__init__(
+            root=root,
+            train=train,
+            transform=transform,
+            target_transform=target_transform,
+            download=download)
+
+        self.num_tasks = num_tasks
+        self.num_classes_per_task = len(self.classes) // self.num_tasks
+        self.task_to_class_idx = [
+            tuple([2 * i + j for j in range(self.num_classes_per_task)])
+            for i in range(self.num_tasks)]
+        self.index_to_task_id = [
+            self.targets[i] // self.num_classes_per_task for i in range(len(self.data))]
+
+        task_id_to_num_samples = Counter()
+        for i in range(len(self)):
+            task_id = self.get_task_id(i)
+            task_id_to_num_samples[task_id] += 1
+
+        for task_id in range(self.num_tasks):
+            assert task_id_to_num_samples[task_id] >= 1000, \
+                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+
+    @property
+    def processed_folder(self):
+        return os.path.join(self.root, "SplitCIFAR100", "processed")
+
+    def get_task_id(self, index):
+        assert 0 <= index < len(self.index_to_task_id), index
+        res = self.index_to_task_id[index]
+        assert isinstance(res, int), type(res)
+        return res

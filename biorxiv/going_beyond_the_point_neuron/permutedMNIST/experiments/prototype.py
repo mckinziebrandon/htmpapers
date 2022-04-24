@@ -99,6 +99,10 @@ PROTOTYPE_BASE = dict(
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
+    train_model_args=dict(
+        share_labels=True,
+        num_labels=10,
+    )
 )
 
 PROTOTYPE_2 = deepcopy(PROTOTYPE_BASE)

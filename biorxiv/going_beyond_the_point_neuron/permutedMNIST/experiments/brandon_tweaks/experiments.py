@@ -23,6 +23,7 @@ from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
 from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
     DendriteContinualLearningExperiment,
 )
+from torch.utils.data import DataLoader
 from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
@@ -37,7 +38,6 @@ class BrandonDendriteContinualLearningExperiment(DendriteContinualLearningExperi
 
     def train_epoch(self):
         # (brandon): replaced hardcoded 10 with self.num_classes_per_task
-        assert self.num_classes_per_task == 2, self.num_classes_per_task
         train_dendrite_model(
             model=self.model,
             loader=self.train_loader,
@@ -60,7 +60,6 @@ class BrandonDendriteContinualLearningExperiment(DendriteContinualLearningExperi
             loader = self.val_loader
 
         # (brandon): replaced hardcoded 10 with self.num_classes_per_task
-        assert self.num_classes_per_task == 2, self.num_classes_per_task
         return evaluate_dendrite_model(
             model=self.model,
             loader=loader,
@@ -151,7 +150,6 @@ class BrandonPrototypeContext(metaclass=abc.ABCMeta):
                 self.contexts)
 
         # (brandon): replaced hardcoded 10 with self.num_classes_per_task
-        assert self.num_classes_per_task == 2, self.num_classes_per_task
         return evaluate_dendrite_model(model=self.model,
                                        loader=loader,
                                        device=self.device,
