@@ -43,17 +43,6 @@ from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
 
-from brandon_tweaks import (
-    experiments as brandon_experiments,
-    datasets as brandon_datasets,
-)
-
-
-class SplitMNISTExperiment(vernon_mixins.RezeroWeights,
-                           brandon_experiments.BrandonPrototypeContext,
-                           brandon_experiments.BrandonDendriteContinualLearningExperiment):
-    pass
-
 
 class PrototypeExperiment(vernon_mixins.RezeroWeights,
                           dendrites_mixins.PrototypeContext,
@@ -110,40 +99,6 @@ PROTOTYPE_BASE = dict(
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
-)
-
-# NB: GLOBAL BATCH SIZE CAN'T BE ANY LARGER THAN MIN(EXAMPLES_PER_TASK)
-SPLIT_MNIST = deepcopy(PROTOTYPE_BASE)
-SPLIT_MNIST["dataset_class"] = SplitMNIST
-SPLIT_MNIST["dataset_args"] = dict(
-    root=os.path.expanduser("~/nta/results/data/"),
-    download=True,  # Change to True if running for the first time
-)
-
-NUM_TASKS = 5
-NUM_CLASSES_PER_TASK = 2
-SPLIT_MNIST["model_args"].update(
-    kw_percent_on=0.05,
-    weight_sparsity=0.8,
-    hidden_sizes=[8192, 8192],
-    output_size=NUM_CLASSES_PER_TASK,  # Single output head shared by all tasks
-    num_segments=NUM_TASKS)
-SPLIT_MNIST.update(
-    experiment_class=SplitMNISTExperiment,
-    batch_size=512,
-    val_batch_size=512,
-    num_samples=3,
-    num_tasks=NUM_TASKS,
-    num_classes=NUM_CLASSES_PER_TASK * NUM_TASKS,
-    epochs=5,
-    optimizer_args=dict(lr=1e-4),
-    tasks_to_validate=[4],
-)
-# ok yes they had a 10 hardcoded F.M.L.
-# (dendrite_cl_experiment L84)
-SPLIT_MNIST['train_model_args'] = dict(
-    share_labels=True,
-    num_labels=NUM_CLASSES_PER_TASK
 )
 
 PROTOTYPE_2 = deepcopy(PROTOTYPE_BASE)
@@ -253,5 +208,4 @@ CONFIGS = dict(
     prototype_25=PROTOTYPE_25,
     prototype_50=PROTOTYPE_50,
     prototype_100=PROTOTYPE_100,
-    split_mnist=SPLIT_MNIST,
 )

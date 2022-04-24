@@ -18,15 +18,18 @@ from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
 
-from brandon_tweaks import (
-    experiments as brandon_experiments,
-    datasets as brandon_datasets,
+from . import (
+    experiments as b_experiments,
+    datasets as b_datasets,
+    mixins as b_mixins,
 )
 
 
+# Reminder: MRO will use the first defined method encountered in the class list:
 class SplitMNISTExperiment(vernon_mixins.RezeroWeights,
-                           brandon_experiments.BrandonPrototypeContext,
-                           brandon_experiments.BrandonDendriteContinualLearningExperiment):
+                           b_experiments.BrandonPrototypeContext,
+                           b_mixins.SplitDatasetTaskIndices,
+                           b_experiments.BrandonDendriteContinualLearningExperiment):
     pass
 
 
@@ -40,7 +43,7 @@ SPLIT_MNIST_BASE = dict(
     # Results path
     local_dir=os.path.expanduser("~/nta/results/experiments/dendrites"),
 
-    dataset_class=brandon_datasets.SplitMNIST,
+    dataset_class=b_datasets.SplitMNIST,
     dataset_args=dict(
         root=os.path.expanduser("~/nta/results/data/"),
         download=True,  # Change to True if running for the first time
@@ -59,9 +62,6 @@ SPLIT_MNIST_BASE = dict(
         context_percent_on=0.1,
     ),
 
-    # batch_size=2,
-    # val_batch_size=2,
-    # tasks_to_validate=[4],
     batch_size=256,
     val_batch_size=512,
     tasks_to_validate=[1, 4, 9, 24, 49, 99],
@@ -90,7 +90,6 @@ SPLIT_MNIST.update(
     experiment_class=SplitMNISTExperiment,
     batch_size=BATCH_SIZE,
     val_batch_size=BATCH_SIZE,
-    num_samples=3,
     num_tasks=NUM_TASKS,
     num_classes=NUM_CLASSES_PER_TASK * NUM_TASKS,
     epochs=5,

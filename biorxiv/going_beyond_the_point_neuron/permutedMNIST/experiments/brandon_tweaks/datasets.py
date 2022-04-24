@@ -76,3 +76,6 @@ class SplitMNIST(datasets.MNIST):
         assert isinstance(res, int), type(res)
         assert 0 <= res < 5, res
         return res
+
+class SplitCIFAR10(datasets.CIFAR10):
+    pass
