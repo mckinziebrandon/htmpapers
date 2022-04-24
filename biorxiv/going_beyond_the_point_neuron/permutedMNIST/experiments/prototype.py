@@ -43,69 +43,15 @@ from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
 from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from nupic.torch.modules import KWinners
 
+from brandon_tweaks import (
+    experiments as brandon_experiments,
+    datasets as brandon_datasets,
+)
 
-class SplitMNIST(datasets.MNIST):
-
-    def __init__(self, train, root=".", target_transform=None,
-                 download=False, normalize=True):
-
-        t = [transforms.ToTensor()]
-        if normalize:
-            t.append(transforms.Normalize((0.13062755,), (0.30810780,)))
-        data_transform = transforms.Compose(t)
-        super().__init__(root=root, train=train, transform=data_transform,
-                         target_transform=target_transform, download=download)
-
-        # (0, 1), (2, 3), (4, 5), (6, 7), (8, 9)
-        self.num_tasks = 5
-        self.task_to_digits = [
-            (2 * i, 2 * i + 1) for i in range(self.num_tasks)]
-        self.index_to_task_id = [
-            self[i][1] // 2
-            for i in range(len(self.data))
-        ]
-
-        from collections import Counter
-        task_id_to_num_samples = Counter()
-        for i in range(len(self)):
-            task_id = self.get_task_id(i)
-            task_id_to_num_samples[task_id] += 1
-
-        for task_id in range(5):
-            assert task_id_to_num_samples[task_id] > 1000, \
-                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
-            # assert task_id_to_num_samples[task_id] == len(self.data) // 5, \
-            #     f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
-
-        # self.task_to_data = [[] for _ in range(self.num_tasks)]
-        # for i in range(len(self.data)):
-        #     img, target = super().__getitem__(i % len(self.data))
-        #     task_idx = target // 2
-        #     self.task_to_data[task_idx].append((img, target))
-
-    def __getitem__(self, index):
-        img, target = super().__getitem__(index)
-        return img, target
-
-    def __len__(self):
-        return len(self.data)
-
-    @property
-    def processed_folder(self):
-        return os.path.join(self.root, "SplitMNIST", "processed")
-
-    def get_task_id(self, index):
-        # return index % 2
-        # return index % self.num_tasks
-        assert 0 <= index < len(self.index_to_task_id), index
-        res = self.index_to_task_id[index]
-        assert isinstance(res, int), type(res)
-        assert 0 <= res < 5, res
-        return res
 
 class SplitMNISTExperiment(vernon_mixins.RezeroWeights,
-                          dendrites_mixins.PrototypeContext,
-                          DendriteContinualLearningExperiment):
+                           brandon_experiments.BrandonPrototypeContext,
+                           brandon_experiments.BrandonDendriteContinualLearningExperiment):
     pass
 
 
@@ -173,29 +119,31 @@ SPLIT_MNIST["dataset_args"] = dict(
     root=os.path.expanduser("~/nta/results/data/"),
     download=True,  # Change to True if running for the first time
 )
+
+NUM_TASKS = 5
+NUM_CLASSES_PER_TASK = 2
 SPLIT_MNIST["model_args"].update(
     kw_percent_on=0.05,
     weight_sparsity=0.8,
     hidden_sizes=[8192, 8192],
-    output_size=2,  # Single output head shared by all tasks
-    num_segments=5)
+    output_size=NUM_CLASSES_PER_TASK,  # Single output head shared by all tasks
+    num_segments=NUM_TASKS)
 SPLIT_MNIST.update(
     experiment_class=SplitMNISTExperiment,
     batch_size=512,
     val_batch_size=512,
     num_samples=3,
-    num_tasks=5,
-    num_classes=2 * 5,
+    num_tasks=NUM_TASKS,
+    num_classes=NUM_CLASSES_PER_TASK * NUM_TASKS,
     epochs=5,
     optimizer_args=dict(lr=1e-4),
     tasks_to_validate=[4],
 )
-# TODO: why the fuck is the required for me but not permutedMNIST???
 # ok yes they had a 10 hardcoded F.M.L.
 # (dendrite_cl_experiment L84)
 SPLIT_MNIST['train_model_args'] = dict(
     share_labels=True,
-    num_labels=2
+    num_labels=NUM_CLASSES_PER_TASK
 )
 
 PROTOTYPE_2 = deepcopy(PROTOTYPE_BASE)
@@ -295,7 +243,6 @@ PROTOTYPE_100.update(
     epochs=3,
     optimizer_args=dict(lr=1e-4),
 )
-
 
 # Export configurations in this file
 CONFIGS = dict(

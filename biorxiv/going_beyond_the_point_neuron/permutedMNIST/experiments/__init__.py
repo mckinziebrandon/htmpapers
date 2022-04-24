@@ -34,6 +34,7 @@ from .prototype_ten_segments import CONFIGS as PROTOTYPE_TEN_SEGMENTS
 from .si_prototype import CONFIGS as SI_PROTOTYPE
 from .sp_context import CONFIGS as SP_CONTEXT
 from .sp_context_search import CONFIGS as SP_PROTO
+from .brandon_tweaks.configs import CONFIGS as BRANDON_CONFIGS
 
 """
 Import and collect all experiment configurations into one CONFIG
@@ -57,3 +58,4 @@ CONFIGS.update(PROTOTYPE_TEN_SEGMENTS)
 CONFIGS.update(SI_PROTOTYPE)
 CONFIGS.update(SP_CONTEXT)
 CONFIGS.update(SP_PROTO)
+CONFIGS.update(BRANDON_CONFIGS)
