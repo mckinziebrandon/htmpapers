@@ -96,6 +96,10 @@ BASE10 = dict(
     optimizer_class=torch.optim.Adam,
     optimizer_args=dict(lr=5e-4),
 )
+NUM_CLASSES_PER_TASK = 10
+BASE10['train_model_args'] = dict(
+    share_labels=True,
+    num_labels=NUM_CLASSES_PER_TASK)
 
 # varying only num segments
 SEGMENT_SEARCH = deepcopy(BASE10)

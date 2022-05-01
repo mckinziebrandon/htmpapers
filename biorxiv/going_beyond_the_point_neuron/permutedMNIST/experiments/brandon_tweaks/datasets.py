@@ -21,14 +21,13 @@ from nupic.torch.modules import KWinners
 
 class SplitMNIST(datasets.MNIST):
 
-    def __init__(self, train, root=".", target_transform=None,
-                 download=False, normalize=True):
-
-        t = [transforms.ToTensor()]
-        if normalize:
-            t.append(transforms.Normalize((0.13062755,), (0.30810780,)))
-        data_transform = transforms.Compose(t)
-        super().__init__(root=root, train=train, transform=data_transform,
+    def __init__(self,
+                 train,
+                 root=".",
+                 transform=None,
+                 target_transform=None,
+                 download=False):
+        super().__init__(root=root, train=train, transform=transform,
                          target_transform=target_transform, download=download)
 
         # (0, 1), (2, 3), (4, 5), (6, 7), (8, 9)
