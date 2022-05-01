@@ -51,23 +51,28 @@ class BrandonDendriteContinualLearningExperiment(DendriteContinualLearningExperi
             self.logger.info("Training task %d, epoch %d...", self.current_task, e)
             self.run_epoch()
 
-        # TODO: put back evaluation_metrics from cl_experiment
-        # TODO: add option to run validate on all tasks at end of training.
-        # TODO: add option to run validate on one task at a time during training
         ret = {}
+        total_correct = torch.tensor(0, device=self.device)
+        total_tested = 0
+        total_loss = 0.0
         if self.current_task in self.tasks_to_validate:
             #  Compute metrics separately on each task.
             for task_idx in range(self.current_task + 1):
                 self.val_loader.sampler.set_active_tasks(task_idx)
                 task_metrics = self.validate()
+                total_correct += task_metrics['total_correct']
+                total_tested += task_metrics['total_tested']
+                total_loss += task_metrics['mean_loss'] * task_metrics['total_tested']
                 ret.update({
                     f'task_{task_idx}_{k}': v for k, v in task_metrics.items()
                 })
 
-            #  Compute overall mean accuracy.
-            self.val_loader.sampler.set_active_tasks(
-                range(self.current_task + 1))
-            ret.update(self.validate())
+            ret.update(dict(
+                total_correct=total_correct.item(),
+                total_tested=total_tested,
+                mean_loss=total_loss / total_tested if total_tested > 0 else 0,
+                mean_accuracy=torch.true_divide(total_correct, total_tested) if total_tested > 0 else 0,
+            ))
 
             self.val_loader.sampler.set_active_tasks(self.current_task)
 
