@@ -28,16 +28,67 @@ This setup is very similar to that of context-dependent gating model from the pa
 'Alleviating catastrophic forgetting using contextdependent gating and synaptic
 stabilization' (Masse et al., 2018).
 """
+
+import os
+import time
+from pprint import pprint
+
+import ray
+import ray.resource_spec
+import torch
+from ray.tune import Trainable, tune
+
+from nupic.research.frameworks.vernon import interfaces
+from nupic.research.frameworks.vernon.experiment_utils import get_free_port
+from nupic.research.frameworks.vernon.search import TrialsCollection
+
+from nupic.research.frameworks.ray.ray_utils import get_last_checkpoint, register_torch_serializers
+from nupic.research.frameworks.ray.trainables import DistributedTrainable, RemoteProcessTrainable
+
 import argparse
 import copy
 
 from experiments import CONFIGS
-from nupic.research.frameworks.ray.run_with_raytune import run as run_with_ray_tune
 from nupic.research.frameworks.vernon.parser_utils import (
     get_default_parsers,
     process_args,
 )
 from nupic.research.frameworks.vernon.run import run as run
+# from nupic.research.frameworks.ray.run_with_raytune import run as run_with_ray_tune
+from nupic.research.frameworks.ray.run_with_raytune import (
+    get_tune_kwargs,
+    run_single_instance
+)
+
+def _run(config):
+    if config.get("single_instance", False):
+        assert False
+        return run_single_instance(config)
+
+    # Connect to ray
+    local_mode = config.get("local_mode", False)
+    if local_mode:
+        assert False
+        address = None
+    else:
+        address = os.environ.get("REDIS_ADDRESS", config.get("redis_address"))
+    ray.init(address=address, local_mode=local_mode)
+
+    # Register serializer and deserializer - needed when logging arrays and tensors.
+    if not config.get("local_mode", False):
+        register_torch_serializers()
+
+    # Get ray.tune kwargs for the given config.
+    kwargs = get_tune_kwargs(config)
+
+    # Queue trials until the cluster scales up
+    kwargs.update(queue_trials=False)
+
+    pprint(kwargs)
+    result = tune.run(**kwargs)
+    ray.shutdown()
+    return result
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -62,7 +113,13 @@ if __name__ == "__main__":
         config = copy.deepcopy(CONFIGS[experiment])
 
         # Merge configuration with command line arguments
-        config.update(vars(args))
+        for k, v in vars(args).items():
+            if k not in config:
+                print(f'WARNING: Setting default CLI arg: config[{k}] = {v}')
+                config[k] = v
+            else:
+                print(f'WARNING: Skipping CLI arg={k} with value={v} because it '
+                      f'already exists in user config with value={config[k]}')
         config.update(name=experiment)
 
         config = process_args(args, config)
@@ -72,4 +129,5 @@ if __name__ == "__main__":
         if args.run_without_ray_tune:
             run(config)
         else:
-            run_with_ray_tune(config)
+            _run(config)
+            # run_with_ray_tune(config)

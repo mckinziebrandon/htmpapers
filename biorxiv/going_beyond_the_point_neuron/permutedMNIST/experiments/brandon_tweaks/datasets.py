@@ -11,7 +11,7 @@ def build_task_and_index_mappings(num_tasks, num_classes_per_task, targets):
 
     # index_to_task_id[i] == task ID assigned to the `i` example in the dataset.
     index_to_task_id = [
-        target // num_classes_per_task for target in targets]
+        target.item() // num_classes_per_task for target in targets]
 
     return task_to_targets, index_to_task_id
 

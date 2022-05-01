@@ -14,6 +14,7 @@ from nupic.research.frameworks.vernon import mixins as vernon_mixins
 from ..prototype import PROTOTYPE_10
 from . import (
     processing,
+    trainables,
     experiments as b_experiments,
     datasets as b_datasets,
     mixins as b_mixins,
@@ -135,9 +136,11 @@ BASE = dict(
                                        # SGD with default hyperparameter settings
 
     # Resources.
+    ray_trainable=trainables.BrandonRemoteProcessTrainable,
     workers=8,
     num_gpus=1,
-    num_cpus=12,
+    num_cpus=10,
+    memory=50 * 1024**3,
     # # https://docs.ray.io/en/releases-0.8.7/_modules/ray/tune/tune.html?highlight=queue_trials#
     # resources_per_trial=dict(
     #     cpu=10,
@@ -146,7 +149,9 @@ BASE = dict(
     #     # https://docs.ray.io/en/releases-0.8.7/_modules/ray/tune/resources.html?highlight=extra_memory#
     #     memory=50 * 1024**3,
     # ),
-    # reuse_actors=True
+    reuse_actors=True,
+    fail_fast=True,
+    queue_trials=False,
 )
 
 # -----------------------------------------------
@@ -226,7 +231,15 @@ SPLIT_CIFAR100_10 = make_config(
 # -----------------------------------------------
 # Hyperparameter Search Configs
 # -----------------------------------------------
-SEARCH_SPLIT_MNIST = as_search_config(SPLIT_MNIST)
+# SEARCH_SPLIT_MNIST = as_search_config(SPLIT_MNIST)
+SEARCH_SPLIT_MNIST = as_search_config(
+    SPLIT_MNIST,
+    kw_percent_on=(0.01, 0.5),
+    weight_sparsity=(0.5, 0.8),
+    hidden_sizes=(2048, 4096, 8192),
+    num_layers=(2, 3),
+    lr=(1e-4, 5e-4))
+
 SEARCH_SPLIT_CIFAR10 = as_search_config(SPLIT_CIFAR10)
 SEARCH_SPLIT_CIFAR10_NOAUG = as_search_config(SPLIT_CIFAR10)
 SEARCH_SPLIT_CIFAR10_NOAUG["train_dataset_args"].update(
