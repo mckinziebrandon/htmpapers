@@ -54,7 +54,7 @@ class BrandonDendriteContinualLearningExperiment(DendriteContinualLearningExperi
         ret = {}
         total_correct = torch.tensor(0, device=self.device)
         total_tested = 0
-        total_loss = 0.0
+        total_loss = torch.tensor(0., device=self.device)
         if self.current_task in self.tasks_to_validate:
             #  Compute metrics separately on each task.
             for task_idx in range(self.current_task + 1):
@@ -70,8 +70,8 @@ class BrandonDendriteContinualLearningExperiment(DendriteContinualLearningExperi
             ret.update(dict(
                 total_correct=total_correct.item(),
                 total_tested=total_tested,
-                mean_loss=total_loss / total_tested if total_tested > 0 else 0,
-                mean_accuracy=torch.true_divide(total_correct, total_tested) if total_tested > 0 else 0,
+                mean_loss=total_loss.item() / total_tested if total_tested > 0 else 0,
+                mean_accuracy=torch.true_divide(total_correct, total_tested).item() if total_tested > 0 else 0,
             ))
 
             self.val_loader.sampler.set_active_tasks(self.current_task)
