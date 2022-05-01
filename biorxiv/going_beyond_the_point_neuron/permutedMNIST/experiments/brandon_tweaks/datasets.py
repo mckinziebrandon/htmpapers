@@ -1,28 +1,47 @@
-from collections import Counter
 import os
-from copy import deepcopy
-
-import numpy as np
-import ray.tune as tune
-import torch
-import torch.nn.functional as F
-from torchvision import datasets, transforms
-
-from nupic.research.frameworks.continual_learning import mixins as cl_mixins
-from nupic.research.frameworks.dendrites import DendriticMLP
-from nupic.research.frameworks.dendrites import mixins as dendrites_mixins
-from nupic.research.frameworks.dendrites.dendrite_cl_experiment import (
-    DendriteContinualLearningExperiment,
-)
-from nupic.research.frameworks.pytorch.datasets import PermutedMNIST
-from nupic.research.frameworks.vernon import mixins as vernon_mixins
-from nupic.torch.modules import KWinners
+from collections import Counter
+from torchvision import datasets
 
 
-class SplitMNIST(datasets.MNIST):
+def build_task_and_index_mappings(num_tasks, num_classes_per_task, targets):
+    # task_to_targets[i] == list of all targets belonging to task `i`.
+    task_to_targets = [
+        tuple([num_classes_per_task * i + j for j in range(num_classes_per_task)])
+        for i in range(num_tasks)]
+
+    # index_to_task_id[i] == task ID assigned to the `i` example in the dataset.
+    index_to_task_id = [
+        target // num_classes_per_task for target in targets]
+
+    return task_to_targets, index_to_task_id
+
+
+def check_dataset(ds):
+    task_id_to_num_samples = Counter()
+    for i in range(len(ds)):
+        task_id = ds.get_task_id(i)
+        task_id_to_num_samples[task_id] += 1
+
+    for task_id in range(ds.num_tasks):
+        assert task_id_to_num_samples[task_id] >= 1000, \
+            f'[{task_id}] [{len(ds.data)}] {task_id_to_num_samples[task_id]}'
+
+
+class GetTaskIDMixin:
+
+    def get_task_id(self, index):
+        assert 0 <= index < len(self.index_to_task_id), index
+        res = self.index_to_task_id[index]
+        assert isinstance(res, int), type(res)
+        assert 0 <= res < self.num_tasks, res
+        return res
+
+
+class SplitMNIST(datasets.MNIST, GetTaskIDMixin):
 
     def __init__(self,
                  train,
+                 num_tasks: int = 5,
                  root=".",
                  transform=None,
                  target_transform=None,
@@ -30,42 +49,22 @@ class SplitMNIST(datasets.MNIST):
         super().__init__(root=root, train=train, transform=transform,
                          target_transform=target_transform, download=download)
 
-        # (0, 1), (2, 3), (4, 5), (6, 7), (8, 9)
-        self.num_tasks = 5
-        self.task_to_digits = [
-            (2 * i, 2 * i + 1) for i in range(self.num_tasks)]
-        self.index_to_task_id = [
-            self[i][1] // 2
-            for i in range(len(self.data))
-        ]
-
-        task_id_to_num_samples = Counter()
-        for i in range(len(self)):
-            task_id = self.get_task_id(i)
-            task_id_to_num_samples[task_id] += 1
-
-        for task_id in range(5):
-            assert task_id_to_num_samples[task_id] > 1000, \
-                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+        self.num_tasks = num_tasks
+        self.num_classes_per_task = len(self.classes) // self.num_tasks
+        self.task_to_digits, self.index_to_task_id = build_task_and_index_mappings(
+            self.num_tasks, self.num_classes_per_task, self.targets)
+        check_dataset(self)
 
     @property
     def processed_folder(self):
         return os.path.join(self.root, "SplitMNIST", "processed")
 
-    def get_task_id(self, index):
-        # return index % 2
-        # return index % self.num_tasks
-        assert 0 <= index < len(self.index_to_task_id), index
-        res = self.index_to_task_id[index]
-        assert isinstance(res, int), type(res)
-        assert 0 <= res < 5, res
-        return res
 
-
-class SplitCIFAR10(datasets.CIFAR10):
+class SplitCIFAR10(datasets.CIFAR10, GetTaskIDMixin):
 
     def __init__(self,
                  train,
+                 num_tasks: int = 5,
                  root=".",
                  transform=None,
                  target_transform=None,
@@ -77,34 +76,18 @@ class SplitCIFAR10(datasets.CIFAR10):
             target_transform=target_transform,
             download=download)
 
-        self.num_tasks = 5
-        self.task_to_class_idx = [
-            (2 * i, 2 * i + 1) for i in range(self.num_tasks)]
-        self.index_to_task_id = [
-            self[i][1] // 2 for i in range(len(self.data))]
-
-        task_id_to_num_samples = Counter()
-        for i in range(len(self)):
-            task_id = self.get_task_id(i)
-            task_id_to_num_samples[task_id] += 1
-
-        for task_id in range(5):
-            assert task_id_to_num_samples[task_id] > 1000, \
-                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+        self.num_tasks = num_tasks
+        self.num_classes_per_task = len(self.classes) // self.num_tasks
+        self.task_to_class_idx, self.index_to_task_id = build_task_and_index_mappings(
+            self.num_tasks, self.num_classes_per_task, self.targets)
+        check_dataset(self)
 
     @property
     def processed_folder(self):
         return os.path.join(self.root, "SplitCIFAR10", "processed")
 
-    def get_task_id(self, index):
-        assert 0 <= index < len(self.index_to_task_id), index
-        res = self.index_to_task_id[index]
-        assert isinstance(res, int), type(res)
-        assert 0 <= res < 5, res
-        return res
 
-
-class SplitCIFAR100(datasets.CIFAR100):
+class SplitCIFAR100(datasets.CIFAR100, GetTaskIDMixin):
 
     def __init__(self,
                  train,
@@ -119,30 +102,12 @@ class SplitCIFAR100(datasets.CIFAR100):
             transform=transform,
             target_transform=target_transform,
             download=download)
-
         self.num_tasks = num_tasks
         self.num_classes_per_task = len(self.classes) // self.num_tasks
-        self.task_to_class_idx = [
-            tuple([2 * i + j for j in range(self.num_classes_per_task)])
-            for i in range(self.num_tasks)]
-        self.index_to_task_id = [
-            self.targets[i] // self.num_classes_per_task for i in range(len(self.data))]
-
-        task_id_to_num_samples = Counter()
-        for i in range(len(self)):
-            task_id = self.get_task_id(i)
-            task_id_to_num_samples[task_id] += 1
-
-        for task_id in range(self.num_tasks):
-            assert task_id_to_num_samples[task_id] >= 1000, \
-                f'[{task_id}] [{len(self.data)}] {task_id_to_num_samples[task_id]}'
+        self.task_to_class_idx, self.index_to_task_id = build_task_and_index_mappings(
+            self.num_tasks, self.num_classes_per_task, self.targets)
+        check_dataset(self)
 
     @property
     def processed_folder(self):
         return os.path.join(self.root, "SplitCIFAR100", "processed")
-
-    def get_task_id(self, index):
-        assert 0 <= index < len(self.index_to_task_id), index
-        res = self.index_to_task_id[index]
-        assert isinstance(res, int), type(res)
-        return res

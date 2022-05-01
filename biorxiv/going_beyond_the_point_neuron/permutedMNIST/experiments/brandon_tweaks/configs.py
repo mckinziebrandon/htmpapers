@@ -133,6 +133,20 @@ BASE = dict(
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,  # On permutedMNIST, Adam works better than
                                        # SGD with default hyperparameter settings
+
+    # Resources.
+    workers=8,
+    num_gpus=1,
+    num_cpus=12,
+    # # https://docs.ray.io/en/releases-0.8.7/_modules/ray/tune/tune.html?highlight=queue_trials#
+    # resources_per_trial=dict(
+    #     cpu=10,
+    #     gpu=1,
+    #     # I guess this is in units of Bytes, so multiply by 1024**3 to convert to GiB.
+    #     # https://docs.ray.io/en/releases-0.8.7/_modules/ray/tune/resources.html?highlight=extra_memory#
+    #     memory=50 * 1024**3,
+    # ),
+    # reuse_actors=True
 )
 
 # -----------------------------------------------
