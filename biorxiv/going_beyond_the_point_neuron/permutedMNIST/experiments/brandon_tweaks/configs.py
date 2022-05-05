@@ -257,9 +257,9 @@ SEARCH_SPLIT_MNIST = as_search_config(
     SPLIT_MNIST,
     kw_percent_on=(0.05, 0.2),
     weight_sparsity=(0.0, 0.5, 0.8),
-    hidden_sizes=(4096, 8192),
+    hidden_sizes=(256, 512, 4096),
     num_layers=(2, 3),
-    lr=(1e-5, 1e-4, 5e-4))
+    lr=(1e-5, 1e-4, 5e-4, 1e-3))
 SEARCH_SPLIT_MNIST_NOAUG = deepcopy(SEARCH_SPLIT_MNIST)
 SEARCH_SPLIT_MNIST_NOAUG["train_dataset_args"].update(
     transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD))
@@ -385,6 +385,27 @@ SEARCH_SI_SPLIT_CIFAR10_NOAUG = deepcopy(SEARCH_SI_SPLIT_CIFAR10)
 SEARCH_SI_SPLIT_CIFAR10_NOAUG["train_dataset_args"].update(
     transform=processing.get_dataset_transform('valid', CIFAR10_MEAN, CIFAR10_STD))
 
+SEARCH_SI_SPLIT_MNIST = deepcopy(SEARCH_SPLIT_MNIST)
+SEARCH_SI_SPLIT_MNIST['si_args'] = dict(
+    c=0.1,
+    damping=0.1,
+    apply_to_dendrites=tune.grid_search([True, False])
+)
+# The SI paper reports not resetting the Adam
+# optimizer between tasks, and this
+# works well with dendrites too
+# experiment_class = BrandonSearchSIPrototypeExperiment,
+SEARCH_SI_SPLIT_MNIST.update(
+    experiment_class=BrandonSearchSISplitDataExperiment,
+    reset_optimizer_after_tasks=False,
+    epochs=tune.grid_search([5, 10]),
+)
+
+SEARCH_SI_SPLIT_MNIST_NOAUG = deepcopy(SEARCH_SI_SPLIT_MNIST)
+SEARCH_SI_SPLIT_MNIST_NOAUG["train_dataset_args"].update(
+    transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD))
+
+
 # Export configurations in this file
 CONFIGS = dict(
     split_mnist=SPLIT_MNIST,
@@ -395,6 +416,8 @@ CONFIGS = dict(
     # Hyperparameter search configs:
     search_split_mnist=SEARCH_SPLIT_MNIST,
     search_split_mnist_noaug=SEARCH_SPLIT_MNIST_NOAUG,
+    search_si_split_mnist=SEARCH_SI_SPLIT_MNIST,
+    search_si_split_mnist_noaug=SEARCH_SI_SPLIT_MNIST,
     search_cifar10=SEARCH_SPLIT_CIFAR10,
     search_cifar10_noaug=SEARCH_SPLIT_CIFAR10_NOAUG,
     search_cifar100_2=SEARCH_CIFAR100_2,
