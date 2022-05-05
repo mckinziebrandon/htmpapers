@@ -24,11 +24,11 @@ from . import (
 
 def as_search_config(
         config,
-        kw_percent_on=(0.01, 0.05, 0.2),
-        weight_sparsity=(0.5, 0.8, 0.95),
-        hidden_sizes=(2048, 4096, 8192),
-        num_layers=(2, 3),
-        lr=(1e-4, 5e-4),
+        kw_percent_on=(0.05, 0.2),
+        weight_sparsity=(0.0, 0.5, 0.8),
+        hidden_sizes=(4096, 8192),
+        num_layers=(3,),
+        lr=(1e-5, 1e-4, 5e-4),
 ):
     search_hidden_sizes = []
     for hs in hidden_sizes:
@@ -74,6 +74,16 @@ def make_config(
 
 # Reminder: MRO will use the first defined method encountered in the class list:
 class SplitDataExperiment(
+    vernon_mixins.RezeroWeights,
+    b_mixins.BrandonPrototypeContext,
+    b_mixins.SplitDatasetTaskIndices,
+    b_experiments.BrandonDendriteContinualLearningExperiment
+):
+    pass
+
+
+class BrandonSearchSISplitDataExperiment(
+    cl_mixins.SynapticIntelligence,
     vernon_mixins.RezeroWeights,
     b_mixins.BrandonPrototypeContext,
     b_mixins.SplitDatasetTaskIndices,
@@ -245,16 +255,21 @@ SPLIT_CIFAR100_10 = make_config(
 # SEARCH_SPLIT_MNIST = as_search_config(SPLIT_MNIST)
 SEARCH_SPLIT_MNIST = as_search_config(
     SPLIT_MNIST,
-    kw_percent_on=(0.01, 0.05),
-    weight_sparsity=(0.8, 0.95),
+    kw_percent_on=(0.05, 0.2),
+    weight_sparsity=(0.0, 0.5, 0.8),
     hidden_sizes=(4096, 8192),
     num_layers=(2, 3),
-    lr=(1e-4, 5e-4))
+    lr=(1e-5, 1e-4, 5e-4))
 SEARCH_SPLIT_MNIST_NOAUG = deepcopy(SEARCH_SPLIT_MNIST)
 SEARCH_SPLIT_MNIST_NOAUG["train_dataset_args"].update(
     transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD))
 
-SEARCH_SPLIT_CIFAR10 = as_search_config(SPLIT_CIFAR10)
+SEARCH_SPLIT_CIFAR10 = as_search_config(
+    SPLIT_CIFAR10,
+    num_layers=(3,),
+    hidden_sizes=(2048, 4096),
+    lr=(1e-5, 1e-4, 1e-3),
+)
 SEARCH_SPLIT_CIFAR10_NOAUG = as_search_config(SPLIT_CIFAR10)
 SEARCH_SPLIT_CIFAR10_NOAUG["train_dataset_args"].update(
     transform=processing.get_dataset_transform('valid', CIFAR10_MEAN, CIFAR10_STD))
@@ -265,7 +280,7 @@ SEARCH_CIFAR100_5 = as_search_config(SPLIT_CIFAR100_5)
 SEARCH_CIFAR100_10 = as_search_config(
     SPLIT_CIFAR100_10,
     kw_percent_on=(0.01, 0.05, 0.2),
-    weight_sparsity=(0.5, 0.8, 0.95),
+    weight_sparsity=(0.0, 0.5, 0.8),
     hidden_sizes=(4096, 8192),
     num_layers=(2, 3),
     lr=(5e-5, 1e-4, 5e-4))
@@ -276,7 +291,14 @@ SEARCH_CIFAR100_10_NOAUG["train_dataset_args"].update(
 
 # SI Prototype
 # -----------------------------------------------
-SEARCH_PROTOTYPE_10 = as_search_config(PROTOTYPE_10)
+SEARCH_PROTOTYPE_10 = as_search_config(
+    PROTOTYPE_10,
+    # hidden_sizes=(4096, 8192),
+    # weight_sparsity=(0.0, 0.2, 0.5, 0.8),
+    # num_layers=(3,),
+    # lr = (5e-6, 1e-5, 5e-5),
+    # kw_percent_on=(0.01, 0.05, 0.2, 0.5),
+)
 SEARCH_PROTOTYPE_10.update(
     experiment_class=BrandonSearchPrototypeExperiment,
     dataset_class=b_datasets.BrandonPermutedMNIST,
@@ -309,37 +331,59 @@ SEARCH_PROTOTYPE_10_NOAUG["train_dataset_args"].update(
 
 # Search Prototype
 # -----------------------------------------------
-# SEARCH_SI_PROTOTYPE_10 = as_search_config(SI_PROTOTYPE_10)
-# SEARCH_PROTOTYPE_10.update(
-#     experiment_class=BrandonSearchSIPrototypeExperiment,
-#     dataset_class=b_datasets.BrandonPermutedMNIST,
-#     tasks_to_validate=list(range(100)),
-#     # Resources.
-#     ray_trainable=trainables.BrandonRemoteProcessTrainable,
-#     workers=8,
-#     num_gpus=1,
-#     num_cpus=10,
-#     memory=50 * 1024 ** 3,
-#     reuse_actors=True,
-#     fail_fast=True,
-#     queue_trials=False,
-# )
-# SEARCH_SI_PROTOTYPE_10['train_model_args'] = dict(
-#     share_labels=True,
-#     num_labels=10)
-# SEARCH_SI_PROTOTYPE_10["train_dataset_args"] = dict(
-#     transform=processing.get_dataset_transform('train', MNIST_MEAN, MNIST_STD),
-#     **SEARCH_SI_PROTOTYPE_10["dataset_args"],
-# )
-# SEARCH_SI_PROTOTYPE_10["valid_dataset_args"] = dict(
-#     transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD),
-#     **SEARCH_SI_PROTOTYPE_10["dataset_args"],
-# )
+SEARCH_SI_PROTOTYPE_10 = as_search_config(SI_PROTOTYPE_10)
+SEARCH_SI_PROTOTYPE_10.update(
+    experiment_class=BrandonSearchSIPrototypeExperiment,
+    dataset_class=b_datasets.BrandonPermutedMNIST,
+    tasks_to_validate=list(range(100)),
+    # Resources.
+    ray_trainable=trainables.BrandonRemoteProcessTrainable,
+    workers=8,
+    num_gpus=1,
+    num_cpus=10,
+    memory=50 * 1024 ** 3,
+    reuse_actors=True,
+    fail_fast=True,
+    queue_trials=False,
+)
+SEARCH_SI_PROTOTYPE_10['si_args'].update(
+    apply_to_dendrites=tune.grid_search([True, False])
+)
+SEARCH_SI_PROTOTYPE_10['train_model_args'] = dict(
+    share_labels=True,
+    num_labels=10)
+SEARCH_SI_PROTOTYPE_10["train_dataset_args"] = dict(
+    transform=processing.get_dataset_transform('train', MNIST_MEAN, MNIST_STD),
+    **SEARCH_SI_PROTOTYPE_10["dataset_args"],
+)
+SEARCH_SI_PROTOTYPE_10["valid_dataset_args"] = dict(
+    transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD),
+    **SEARCH_SI_PROTOTYPE_10["dataset_args"],
+)
 
-# SEARCH_SI_PROTOTYPE_10_NOAUG = deepcopy(SEARCH_SI_PROTOTYPE_10)
-# SEARCH_SI_PROTOTYPE_10_NOAUG["train_dataset_args"].update(
-#     transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD))
+SEARCH_SI_PROTOTYPE_10_NOAUG = deepcopy(SEARCH_SI_PROTOTYPE_10)
+SEARCH_SI_PROTOTYPE_10_NOAUG["train_dataset_args"].update(
+    transform=processing.get_dataset_transform('valid', MNIST_MEAN, MNIST_STD))
 
+SEARCH_SI_SPLIT_CIFAR10 = deepcopy(SEARCH_SPLIT_CIFAR10)
+SEARCH_SI_SPLIT_CIFAR10['si_args'] = dict(
+    c=0.1,
+    damping=0.1,
+    apply_to_dendrites=tune.grid_search([True, False])
+)
+# The SI paper reports not resetting the Adam
+# optimizer between tasks, and this
+# works well with dendrites too
+# experiment_class = BrandonSearchSIPrototypeExperiment,
+SEARCH_SI_SPLIT_CIFAR10.update(
+    experiment_class=BrandonSearchSISplitDataExperiment,
+    reset_optimizer_after_tasks=False,
+    epochs=tune.grid_search([5, 10]),
+)
+
+SEARCH_SI_SPLIT_CIFAR10_NOAUG = deepcopy(SEARCH_SI_SPLIT_CIFAR10)
+SEARCH_SI_SPLIT_CIFAR10_NOAUG["train_dataset_args"].update(
+    transform=processing.get_dataset_transform('valid', CIFAR10_MEAN, CIFAR10_STD))
 
 # Export configurations in this file
 CONFIGS = dict(
@@ -359,4 +403,8 @@ CONFIGS = dict(
     search_cifar100_10_noaug=SEARCH_CIFAR100_10_NOAUG,
     search_prototype_10=SEARCH_PROTOTYPE_10,
     search_prototype_10_noaug=SEARCH_PROTOTYPE_10_NOAUG,
+    search_si_prototype_10=SEARCH_SI_PROTOTYPE_10,
+    search_si_prototype_10_noaug=SEARCH_SI_PROTOTYPE_10_NOAUG,
+    search_si_split_cifar10=SEARCH_SI_SPLIT_CIFAR10,
+    search_si_split_cifar10_noaug=SEARCH_SI_SPLIT_CIFAR10_NOAUG,
 )
