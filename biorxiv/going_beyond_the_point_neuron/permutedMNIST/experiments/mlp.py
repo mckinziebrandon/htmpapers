@@ -67,8 +67,12 @@ DEFAULT = dict(
 
     loss_function=F.cross_entropy,
     optimizer_class=torch.optim.Adam,
-)
 
+    train_model_args=dict(
+        share_labels=True,
+        num_labels=10,
+    )
+)
 
 # MLP with 3 layers on 10 permutedMNIST tasks
 THREE_LAYER_MLP_10 = deepcopy(DEFAULT)

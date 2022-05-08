@@ -25,11 +25,16 @@ def random_affine(
         interpolation=InterpolationMode.BILINEAR)
 
 
-def get_dataset_transform(split: str, mean, std):
+def get_dataset_transform(
+        split: str,
+        mean,
+        std,
+        horizontal_flip_prob=0.5
+):
     transforms_list = []
     if split == 'train':
         transforms_list.extend([
-            transforms.RandomHorizontalFlip(),
+            transforms.RandomHorizontalFlip(horizontal_flip_prob),
             random_affine(),
             random_color_jitter(0.2, 0.1, 0.025)])
 
